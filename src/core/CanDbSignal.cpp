@@ -213,7 +213,19 @@ bool CanDbSignal::isPresentInMessage(const CanMessage &msg)
         return false;
     }
 
-    if ((_startBit + _length)>(8*msg.getLength())) {
+    uint32_t max_byte = 0;
+    if (!_isBigEndian) {
+        max_byte = (_startBit + _length - 1) / 8;
+    } else {
+        int bits_in_first_byte = (_startBit % 8) + 1;
+        if (_length <= bits_in_first_byte) {
+            max_byte = _startBit / 8;
+        } else {
+            max_byte = (_startBit / 8) + 1 + (_length - bits_in_first_byte - 1) / 8;
+        }
+    }
+
+    if (max_byte >= msg.getLength()) {
         return false;
     }
 

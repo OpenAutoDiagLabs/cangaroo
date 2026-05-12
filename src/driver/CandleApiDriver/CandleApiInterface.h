@@ -65,7 +65,7 @@ private:
 
     QList<CandleApiTiming> _timings;
 
-    bool setBitTiming(uint32_t bitrate, uint32_t samplePoint);
+    bool setBitTiming(uint32_t bitrate, uint32_t samplePoint, uint32_t fdBitrate, uint32_t fdSamplePoint, bool useFD);
 };
 
 #endif // CANDLEAPIINTERFACE_H
