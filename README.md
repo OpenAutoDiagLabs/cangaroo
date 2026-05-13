@@ -1,5 +1,5 @@
 # <img src="src/assets/cangaroo.png" width="48" height="48"> Cangaroo
-**Open-source CAN bus analyzer for Linux, Automotive, Robotics, and Industrial Applications**
+**Open-source cross-platform CAN bus analyzer for Automotive, Robotics, and Industrial Applications**
 
 [![Try Cangaroo Now](https://img.shields.io/badge/Try-Cangaroo-blue?style=for-the-badge)](https://github.com/OpenAutoDiagLabs/cangaroo/releases/latest)
 
@@ -12,7 +12,7 @@
 
 Cangaroo is a professional-grade CAN bus analyzer designed for engineers in **Automotive**, **Robotics**, and **Industrial Automation**. It facilitates real-time capture, decoding, and analysis of CAN and CAN‑FD traffic.
 
-> **Works with SocketCAN (Linux), CANable, Candlelight, and CANblaster for immediate testing and real hardware connections.**
+> **Works natively with SocketCAN on Linux and WinUSB/CandleAPI on Windows for immediate real hardware connections.**
 
 ---
 
@@ -37,7 +37,7 @@ Cangaroo is a professional-grade CAN bus analyzer designed for engineers in **Au
 ## 🚀 Key Features
 
 *   **Real-time CAN/CAN-FD Decoding**: Support for standard and high-speed flexible data-rate frames.
-*   **Wide Hardware Compatibility**: Seamlessly works with **SocketCAN** (Linux), **CANable** (SLCAN), **Candlelight**, and **CANblaster** (UDP).
+*   **Wide Hardware Compatibility**: Seamlessly works with **SocketCAN** on Linux (supports PCAN, Kvaser, etc.), **WinUSB/CandleAPI** on Windows (gs_usb/CandleLight adapters), **SLCAN**, and **CANblaster** (UDP).
 *   **DBC Database Support**: Load multiple `.dbc` files to instantly decode frames into human-readable signals.
 *   **Powerful Data Visualization**: Integrated Graphing tools supporting Time-series, Scatter charts, Text-based monitoring, and interactive Gauge views with zoom and live tooltips.
 *   **Advanced Filtering & Logging**: Isolate critical data with live filters and export captures for offline analysis.
@@ -74,9 +74,15 @@ If you downloaded a pre-compiled release tarball, use the included setup script 
 
 ---
 
-## � Hardware & SocketCAN (Linux)
+## 🔌 Hardware Support
 
+Cangaroo is designed to be cross-platform, offering robust hardware support on both Linux and Windows.
+
+### Linux (SocketCAN)
 Cangaroo leverages the standard Linux **SocketCAN** subsystem. This means it works with virtually any CAN interface supported by the Linux kernel.
+
+### Windows (WinUSB / CandleAPI)
+On Windows, Cangaroo includes native support for adapters running the **gs_usb** protocol (such as CANable and CandleLight) via WinUSB and the CandleAPI driver.
 
 ### Supported Hardware
 *   **PEAK-System (PCAN)**: 

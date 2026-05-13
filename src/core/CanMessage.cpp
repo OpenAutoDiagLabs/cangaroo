@@ -204,45 +204,56 @@ void CanMessage::setByte(const uint8_t index, const uint8_t value) {
 
 uint64_t CanMessage::extractRawSignal(uint8_t start_bit, const uint8_t length, const bool isBigEndian) const
 {
-    if (length == 0 || start_bit >= sizeof(_u8) * 8) return 0;
+    if (length == 0 || start_bit >= sizeof(_u8) * 8 || length > 64) return 0;
 
-    int byte_offset = start_bit / 8;
-    int bit_shift = start_bit % 8;
+    if (!isBigEndian) {
+        int byte_offset = start_bit / 8;
+        int bit_shift = start_bit % 8;
 
-    uint8_t temp[8] = {0};
-    int copy_len = sizeof(_u8) - byte_offset;
-    if (copy_len > 8) copy_len = 8;
-    
-    // Copy the relevant bytes up to 8 bytes
-    for (int i=0; i<copy_len; i++) {
-        temp[i] = _u8[byte_offset + i];
+        uint8_t temp[8] = {0};
+        int copy_len = sizeof(_u8) - byte_offset;
+        if (copy_len > 8) copy_len = 8;
+        
+        // Copy the relevant bytes up to 8 bytes
+        for (int i=0; i<copy_len; i++) {
+            temp[i] = _u8[byte_offset + i];
+        }
+
+        uint64_t data_raw = 0;
+        // Interpret as little-endian 64-bit integer
+        for (int i=0; i<8; i++) {
+            data_raw |= ((uint64_t)temp[i]) << (i * 8);
+        }
+        
+        // Shift by bit_shift
+        uint64_t data = data_raw >> bit_shift;
+
+        uint64_t mask = 0xFFFFFFFFFFFFFFFFULL;
+        if (length < 64) {
+            mask = (1ULL << length) - 1;
+        }
+        return data & mask;
+    } else {
+        uint64_t data = 0;
+        int currentBit = start_bit;
+        for (int i = 0; i < length; ++i) {
+            int byteIndex = currentBit / 8;
+            int bitInByte = currentBit % 8;
+            
+            if (byteIndex < sizeof(_u8)) {
+                if (_u8[byteIndex] & (1 << bitInByte)) {
+                    data |= (1ULL << (length - 1 - i));
+                }
+            }
+            
+            if ((currentBit % 8) == 0) {
+                currentBit += 15;
+            } else {
+                currentBit--;
+            }
+        }
+        return data;
     }
-
-    uint64_t data_raw = 0;
-    // Interpret as little-endian 64-bit integer
-    for (int i=0; i<8; i++) {
-        data_raw |= ((uint64_t)temp[i]) << (i * 8);
-    }
-    
-    // Shift by bit_shift
-    uint64_t data = data_raw >> bit_shift;
-
-    uint64_t mask = 0xFFFFFFFFFFFFFFFF;
-    if (length < 64) {
-        mask = (1ULL << length) - 1;
-    }
-    data &= mask;
-
-    // If the length is greater than 8, we need to byteswap to preserve endianness
-    if (isBigEndian && (length > 8))
-    {
-        // Swap bytes
-        data = __builtin_bswap64(data);
-        // Shift out unused bits
-        data >>= 64 - length;
-    }
-
-    return data;
 }
 
 void CanMessage::setDataAt(uint8_t position, uint8_t data)
