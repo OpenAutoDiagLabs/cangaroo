@@ -476,7 +476,7 @@ void SocketCanInterface::sendMessage(const CanMessage &msg) {
         return;
     }
 
-    if (msg.isFD()) {
+    if (msg.isFD() || (supportsCanFD() && msg.getLength() > 8)) {
         struct canfd_frame frame;
         memset(&frame, 0, sizeof(frame));
         frame.can_id = msg.getId();

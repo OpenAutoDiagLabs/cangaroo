@@ -76,6 +76,7 @@ public:
 	void setByte(const uint8_t index, const uint8_t value);
 
     uint64_t extractRawSignal(uint8_t start_bit, const uint8_t length, const bool isBigEndian) const;
+    void setRawSignal(uint8_t start_bit, const uint8_t length, const bool isBigEndian, uint64_t value);
 
     void setDataAt(uint8_t position, uint8_t data);
 	void setData(const uint8_t d0);

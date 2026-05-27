@@ -86,6 +86,8 @@ public:
 
     double convertRawValueToPhysical(const uint64_t rawValue);
     double extractPhysicalFromMessage(const CanMessage &msg);
+    void applyPhysicalToMessage(double physicalValue, CanMessage &msg);
+    void injectRawDataToMessage(uint64_t rawValue, CanMessage &msg);
 
 
 private:

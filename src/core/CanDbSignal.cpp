@@ -242,4 +242,21 @@ uint64_t CanDbSignal::extractRawDataFromMessage(const CanMessage &msg)
     return msg.extractRawSignal(startBit(), length(), isBigEndian());
 }
 
+void CanDbSignal::injectRawDataToMessage(uint64_t rawValue, CanMessage &msg)
+{
+    msg.setRawSignal(startBit(), length(), isBigEndian(), rawValue);
+}
 
+void CanDbSignal::applyPhysicalToMessage(double physicalValue, CanMessage &msg)
+{
+    uint64_t rawValue = 0;
+    if (isUnsigned()) {
+        rawValue = (uint64_t)((physicalValue - _offset) / _factor);
+    } else {
+        int64_t v = (int64_t)((physicalValue - _offset) / _factor);
+        uint64_t mask = 0xFFFFFFFFFFFFFFFFULL;
+        if (_length < 64) mask = (1ULL << _length) - 1;
+        rawValue = v & mask;
+    }
+    injectRawDataToMessage(rawValue, msg);
+}
