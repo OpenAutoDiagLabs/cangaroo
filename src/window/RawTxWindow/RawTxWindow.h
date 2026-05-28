@@ -71,6 +71,7 @@ private slots:
 
     void onSignalTableItemChanged(QTableWidgetItem *item);
 
+    void syncSignalsToMessage();
 
 private:
     Ui::RawTxWindow *ui;

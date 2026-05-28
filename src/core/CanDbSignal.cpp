@@ -89,7 +89,7 @@ void CanDbSignal::setValueName(const uint64_t value, const QString &name)
     _valueTable[value] = name;
 }
 
-double CanDbSignal::convertRawValueToPhysical(const uint64_t rawValue)
+double CanDbSignal::convertRawValueToPhysical(const uint64_t rawValue) const
 {
     if (isUnsigned()) {
         uint64_t v = rawValue;
@@ -103,7 +103,7 @@ double CanDbSignal::convertRawValueToPhysical(const uint64_t rawValue)
     }
 }
 
-double CanDbSignal::extractPhysicalFromMessage(const CanMessage &msg)
+double CanDbSignal::extractPhysicalFromMessage(const CanMessage &msg) const
 {
     return convertRawValueToPhysical(extractRawDataFromMessage(msg));
 }
@@ -207,7 +207,7 @@ void CanDbSignal::setMuxValue(const uint32_t &muxValue)
     _muxValue = muxValue;
 }
 
-bool CanDbSignal::isPresentInMessage(const CanMessage &msg)
+bool CanDbSignal::isPresentInMessage(const CanMessage &msg) const
 {
     if (msg.getRawId() != _parent->getRaw_id()) {
         return false;
@@ -237,7 +237,7 @@ bool CanDbSignal::isPresentInMessage(const CanMessage &msg)
     return _muxValue == muxer->extractRawDataFromMessage(msg);
 }
 
-uint64_t CanDbSignal::extractRawDataFromMessage(const CanMessage &msg)
+uint64_t CanDbSignal::extractRawDataFromMessage(const CanMessage &msg) const
 {
     return msg.extractRawSignal(startBit(), length(), isBigEndian());
 }
@@ -249,14 +249,29 @@ void CanDbSignal::injectRawDataToMessage(uint64_t rawValue, CanMessage &msg)
 
 void CanDbSignal::applyPhysicalToMessage(double physicalValue, CanMessage &msg)
 {
+    if (_factor == 0.0) {
+        return;
+    }
+
+    const double rawD = (physicalValue - _offset) / _factor;
     uint64_t rawValue = 0;
+
     if (isUnsigned()) {
-        rawValue = (uint64_t)((physicalValue - _offset) / _factor);
+        const double rounded = rawD < 0.0 ? 0.0 : rawD + 0.5;
+        rawValue = static_cast<uint64_t>(rounded);
+        if (_length < 64) {
+            const uint64_t maxRaw = (1ULL << _length) - 1;
+            if (rawValue > maxRaw) {
+                rawValue = maxRaw;
+            }
+        }
     } else {
-        int64_t v = (int64_t)((physicalValue - _offset) / _factor);
+        int64_t v = static_cast<int64_t>(rawD < 0.0 ? rawD - 0.5 : rawD + 0.5);
         uint64_t mask = 0xFFFFFFFFFFFFFFFFULL;
-        if (_length < 64) mask = (1ULL << _length) - 1;
-        rawValue = v & mask;
+        if (_length < 64) {
+            mask = (1ULL << _length) - 1;
+        }
+        rawValue = static_cast<uint64_t>(v) & mask;
     }
     injectRawDataToMessage(rawValue, msg);
 }

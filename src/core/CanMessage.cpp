@@ -24,6 +24,32 @@
 #include "CanMessage.h"
 #include <core/portable_endian.h>
 
+// J1939 / many ECUs place multi-byte Intel (@1+) values with MSB in the lower
+// byte index on the bus (e.g. 100 km/h → bytes 6=0x64, 7=0x00). DBC bit-LSE
+// assembly yields the swapped numeric value; fix up whole-byte aligned fields.
+static bool intelUsesSwappedBytes(uint8_t bit_shift, uint8_t length)
+{
+    return bit_shift == 0 && (length == 16 || length == 32 || length == 64);
+}
+
+static uint64_t swapIntelRawBytes(uint64_t value, uint8_t length)
+{
+    switch (length) {
+    case 16:
+        return ((value & 0xFF) << 8) | ((value >> 8) & 0xFF);
+    case 32:
+        return ((value & 0xFF) << 24) | ((value & 0xFF00) << 8)
+             | ((value & 0xFF0000) >> 8) | ((value >> 24) & 0xFF);
+    case 64:
+        return ((value & 0xFF) << 56) | ((value & 0xFF00ULL) << 40)
+             | ((value & 0xFF0000ULL) << 24) | ((value & 0xFF000000ULL) << 8)
+             | ((value & 0xFF00000000ULL) >> 8) | ((value & 0xFF0000000000ULL) >> 24)
+             | ((value & 0xFF000000000000ULL) >> 40) | ((value >> 56) & 0xFF);
+    default:
+        return value;
+    }
+}
+
 enum {
 	id_flag_extended = 0x80000000,
 	id_flag_rtr      = 0x40000000,
@@ -207,17 +233,34 @@ uint64_t CanMessage::extractRawSignal(uint8_t start_bit, const uint8_t length, c
     if (length == 0 || start_bit >= sizeof(_u8) * 8 || length > 64) return 0;
 
     if (!isBigEndian) {
-        uint64_t data = 0;
-        for (int i = 0; i < length; ++i) {
-            int currentBit = start_bit + i;
-            int byteIndex = currentBit / 8;
-            int bitInByte = currentBit % 8;
-            
-            if (byteIndex < sizeof(_u8)) {
-                if (_u8[byteIndex] & (1 << bitInByte)) {
-                    data |= (1ULL << i);
-                }
-            }
+        // Intel (@1+): little-endian byte assembly + bit shift (pre-044201d path)
+        const int byte_offset = start_bit / 8;
+        const int bit_shift   = start_bit % 8;
+
+        uint8_t temp[8] = {0};
+        int copy_len = static_cast<int>(sizeof(_u8)) - byte_offset;
+        if (copy_len > 8) {
+            copy_len = 8;
+        }
+
+        for (int i = 0; i < copy_len; ++i) {
+            temp[i] = _u8[byte_offset + i];
+        }
+
+        uint64_t data_raw = 0;
+        for (int i = 0; i < 8; ++i) {
+            data_raw |= (static_cast<uint64_t>(temp[i]) << (i * 8));
+        }
+
+        uint64_t data = data_raw >> bit_shift;
+
+        uint64_t mask = 0xFFFFFFFFFFFFFFFFULL;
+        if (length < 64) {
+            mask = (1ULL << length) - 1;
+        }
+        data &= mask;
+        if (intelUsesSwappedBytes(bit_shift, length)) {
+            data = swapIntelRawBytes(data, length);
         }
         return data;
     } else {
@@ -248,24 +291,42 @@ void CanMessage::setRawSignal(uint8_t start_bit, const uint8_t length, const boo
     if (length == 0 || start_bit >= sizeof(_u8) * 8 || length > 64) return;
 
     if (!isBigEndian) {
+        // Intel (@1+): inverse of extractRawSignal byte-shift path (a6042cc)
+        const int byte_offset = start_bit / 8;
+        const int bit_shift   = start_bit % 8;
+
         uint64_t mask = 0xFFFFFFFFFFFFFFFFULL;
         if (length < 64) {
             mask = (1ULL << length) - 1;
         }
-        uint64_t val = value & mask;
 
-        for (int i = 0; i < length; ++i) {
-            int currentBit = start_bit + i;
-            int byteIndex = currentBit / 8;
-            int bitInByte = currentBit % 8;
-            
-            if (byteIndex < sizeof(_u8)) {
-                if (val & (1ULL << i)) {
-                    _u8[byteIndex] |= (1 << bitInByte);
-                } else {
-                    _u8[byteIndex] &= ~(1 << bitInByte);
-                }
-            }
+        uint64_t val = value & mask;
+        if (intelUsesSwappedBytes(bit_shift, length)) {
+            val = swapIntelRawBytes(val, length);
+        }
+        const uint64_t valToSet   = val << bit_shift;
+        const uint64_t clearMask  = ~(mask << bit_shift);
+
+        uint8_t temp[8] = {0};
+        int copy_len = static_cast<int>(sizeof(_u8)) - byte_offset;
+        if (copy_len > 8) {
+            copy_len = 8;
+        }
+
+        for (int i = 0; i < copy_len; ++i) {
+            temp[i] = _u8[byte_offset + i];
+        }
+
+        uint64_t data_raw = 0;
+        for (int i = 0; i < 8; ++i) {
+            data_raw |= (static_cast<uint64_t>(temp[i]) << (i * 8));
+        }
+
+        data_raw &= clearMask;
+        data_raw |= valToSet;
+
+        for (int i = 0; i < copy_len; ++i) {
+            _u8[byte_offset + i] = static_cast<uint8_t>((data_raw >> (i * 8)) & 0xFF);
         }
     } else {
         uint64_t mask = 0xFFFFFFFFFFFFFFFFULL;

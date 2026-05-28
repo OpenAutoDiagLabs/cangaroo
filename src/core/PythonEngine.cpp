@@ -6,10 +6,7 @@
 
 #include "PythonEngine.h"
 
-#include <cstring>
-
-#include "core/portable_endian.h"
-
+#include <cmath>
 
 #include <QCoreApplication>
 #include <QDir>
@@ -23,6 +20,7 @@
 #include "core/CanDb.h"
 #include "core/CanDbMessage.h"
 #include "core/CanDbSignal.h"
+#include "core/CanMessage.h"
 
 #include "core/MeasurementSetup.h"
 #include "core/MeasurementNetwork.h"
@@ -38,51 +36,23 @@ using namespace py::literals;
 static PythonEngine *g_activeEngine = nullptr;
 
 // ---------------------------------------------------------------------------
-// Helper: pack a raw value into a CanMessage at the given signal position.
-// This is the inverse of CanMessage::extractRawSignal.
+// Round-trip validator: decode packed bits and compare to the input physical
+// value. Uses the same extractRawSignal path as decode() / signal_value().
 // ---------------------------------------------------------------------------
-static void insertRawSignalIntoMsg(CanMessage &msg,
-                                   uint16_t start_bit,
-                                   uint16_t length,
-                                   bool isBigEndian,
-                                   uint64_t raw) noexcept
+static void validateSignalRoundtrip(const CanMessage &msg,
+                                    const CanDbSignal *sig,
+                                    double expectedPhysical)
 {
-    if (length == 0 || start_bit >= 64 * 8) { return; }
-
-    if (isBigEndian && length > 8)
+    const double decoded = sig->extractPhysicalFromMessage(msg);
+    const double factor  = sig->getFactor();
+    const double tol     = std::max(1e-6, std::abs(factor) * 0.51);
+    if (std::abs(decoded - expectedPhysical) > tol)
     {
-        // Inverse of extractRawSignal's big-endian path:
-        //   extract: result = bswap64((data_raw >> bit_shift) & mask) >> (64 - length)
-        //   insert:  A      = bswap64(raw << (64 - length))
-        // where A is the Intel-order value to place at bit_shift in data_raw.
-        raw <<= (64 - length);
-        raw = __builtin_bswap64(raw);
-    }
-
-    const uint64_t mask       = (length < 64) ? ((1ULL << length) - 1) : ~0ULL;
-    const int      byte_offset = start_bit / 8;
-    const int      bit_shift   = start_bit % 8;
-
-    // Mirror extractRawSignal: limit copy to the actual buffer size (64 bytes for FD).
-    const int copy_len = std::min(8, 64 - byte_offset);
-
-    uint8_t temp[8] = {0};
-    for (int i = 0; i < copy_len; i++)
-    {
-        temp[i] = msg.getByte(static_cast<uint8_t>(byte_offset + i));
-    }
-
-    uint64_t data_raw;
-    memcpy(&data_raw, temp, sizeof(data_raw));
-    data_raw = le64toh(data_raw);
-    data_raw &= ~(mask << bit_shift);
-    data_raw |= (raw & mask) << bit_shift;
-    data_raw = htole64(data_raw);
-    memcpy(temp, &data_raw, sizeof(data_raw));
-
-    for (int i = 0; i < copy_len; i++)
-    {
-        msg.setByte(static_cast<uint8_t>(byte_offset + i), temp[i]);
+        throw py::value_error(
+            std::string("DBC encode round-trip failed for signal '")
+            + sig->name().toStdString()
+            + "': expected " + std::to_string(expectedPhysical)
+            + ", decoded " + std::to_string(decoded));
     }
 }
 
@@ -642,11 +612,18 @@ PYBIND11_EMBEDDED_MODULE(cangaroo, m)
                 }
             }
 
-            insertRawSignalIntoMsg(msg, sig->startBit(), sig->length(), sig->isBigEndian(), raw);
+            msg.setRawSignal(sig->startBit(), sig->length(), sig->isBigEndian(), raw);
+            validateSignalRoundtrip(msg, sig, phys);
         }
 
         return msg;
     }, py::arg("name_or_id"), py::arg("values"));
+
+    // Format a message as a cansend-style line (ID + hex payload).
+    m.def("format_cansend", [](const CanMessage &msg) -> std::string
+    {
+        return ("ID: 0x" + msg.getIdString() + "\nDATA: " + msg.getDataHexString()).toStdString();
+    }, py::arg("msg"));
 
 
 

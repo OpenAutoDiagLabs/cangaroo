@@ -81,11 +81,11 @@ public:
     uint32_t getMuxValue() const;
     void setMuxValue(const uint32_t &muxValue);
 
-    bool isPresentInMessage(const CanMessage &msg);
-    uint64_t extractRawDataFromMessage(const CanMessage &msg);
+    bool isPresentInMessage(const CanMessage &msg) const;
+    uint64_t extractRawDataFromMessage(const CanMessage &msg) const;
 
-    double convertRawValueToPhysical(const uint64_t rawValue);
-    double extractPhysicalFromMessage(const CanMessage &msg);
+    double convertRawValueToPhysical(const uint64_t rawValue) const;
+    double extractPhysicalFromMessage(const CanMessage &msg) const;
     void applyPhysicalToMessage(double physicalValue, CanMessage &msg);
     void injectRawDataToMessage(uint64_t rawValue, CanMessage &msg);
 
