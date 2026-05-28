@@ -668,9 +668,35 @@ void RawTxWindow::onSignalTableItemChanged(QTableWidgetItem *item)
     }
 }
 
+void RawTxWindow::syncSignalsToMessage()
+{
+    if (!_currentDbMsg) {
+        return;
+    }
+
+    const int rows = ui->tableSignals->rowCount();
+    for (int i = 0; i < rows; ++i) {
+        QTableWidgetItem *valItem = ui->tableSignals->item(i, 1);
+        if (!valItem) {
+            continue;
+        }
+        CanDbSignal *sig = static_cast<CanDbSignal *>(valItem->data(Qt::UserRole).value<void *>());
+        if (!sig) {
+            continue;
+        }
+        bool ok = false;
+        const double physicalValue = valItem->text().toDouble(&ok);
+        if (ok) {
+            sig->applyPhysicalToMessage(physicalValue, _can_msg);
+        }
+    }
+}
+
 void RawTxWindow::sendRawMessage()
 {
     reflash_can_msg();
+    // DBC signal values override hex fields for defined signals (correct bit packing).
+    syncSignalsToMessage();
 
     CanInterface *intf = _backend.getInterfaceById(_slavedInterfaceId);
     if(!intf) return;
