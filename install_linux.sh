@@ -50,7 +50,10 @@ install_deps() {
                 libnl-route-3-dev \
                 libgl1-mesa-dev \
                 pkg-config \
-                git
+                git \
+                python3-dev \
+                pybind11-dev \
+                python3-pybind11
             ;;
         fedora)
             echo "Installing dependencies for Fedora (using dnf)..."
@@ -63,7 +66,9 @@ install_deps() {
                 libnl3-devel \
                 mesa-libGL-devel \
                 pkgconf-pkg-config \
-                git
+                git \
+                python3-devel \
+                pybind11-devel
             ;;
         arch)
             echo "Installing dependencies for Arch Linux (using pacman)..."
@@ -75,7 +80,9 @@ install_deps() {
                 libnl \
                 mesa \
                 pkgconf \
-                git
+                git \
+                python \
+                pybind11
             ;;
         *)
             echo -e "${RED}Error: Distribution $OS is not explicitly supported by this script.${NC}"

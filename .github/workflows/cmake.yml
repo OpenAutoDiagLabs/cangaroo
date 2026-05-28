@@ -22,7 +22,8 @@ jobs:
         sudo apt install -y build-essential git cmake \
           qt6-base-dev qt6-base-private-dev qt6-tools-dev \
           libqt6serialport6-dev libqt6charts6-dev \
-          libnl-3-dev libnl-route-3-dev libgl1-mesa-dev fuse libfuse2 wget
+          libnl-3-dev libnl-route-3-dev libgl1-mesa-dev fuse libfuse2 wget \
+          python3-dev pybind11-dev python3-pybind11
 
         echo "=== Qt6 Version ==="
         qmake6 --version
@@ -127,6 +128,8 @@ jobs:
             mingw-w64-x86_64-qt6-tools \
             mingw-w64-x86_64-make \
             mingw-w64-x86_64-ntldd \
+            mingw-w64-x86_64-python \
+            mingw-w64-x86_64-pybind11 \
             git
 
       - name: Verify Qt6 installation
@@ -180,6 +183,7 @@ jobs:
           cp /mingw64/bin/libzstd.dll dist/
           cp /mingw64/bin/libicuuc78.dll dist/
           cp /mingw64/bin/libpcre2-16-0.dll dist/
+          cp /mingw64/bin/libpython3.12.dll dist/ || cp /mingw64/bin/libpython3.11.dll dist/ || true
 
       - name: Deploy MinGW runtime dependencies
         run: |
