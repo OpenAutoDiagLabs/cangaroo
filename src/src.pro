@@ -60,11 +60,27 @@ include($$PWD/window/CanStatusWindow/CanStatusWindow.pri)
 include($$PWD/window/RawTxWindow/RawTxWindow.pri)
 include($$PWD/window/TxGeneratorWindow/TxGeneratorWindow.pri)
 include($$PWD/window/ReplayWindow/ReplayWindow.pri)
+include($$PWD/window/ScriptWindow/ScriptWindow.pri)
 
 
 unix:PKGCONFIG += libnl-3.0
 unix:PKGCONFIG += libnl-route-3.0
+unix:PKGCONFIG += python3-embed
 unix:INCLUDEPATH += /usr/include/libnl3
+
+# Try python3 first, fallback to python
+PY_CMD = python3
+win32 {
+    PY_CMD = python
+    CONFIG += link_pkgconfig
+    PKGCONFIG += python3-embed
+}
+
+PYBIND_INCLUDES = $$system($$PY_CMD -m pybind11 --includes)
+# Split the string by space and remove -I prefixes
+PYBIND_INCLUDES_CLEAN = $$replace(PYBIND_INCLUDES, "-I", "")
+INCLUDEPATH += $$PYBIND_INCLUDES_CLEAN
+
 # Surgical fix for redundant /lib/lib path from pkg-config
 unix:LIBS ~= s|/usr/lib/lib/|/usr/lib/|g
 unix:include($$PWD/driver/SocketCanDriver/SocketCanDriver.pri)

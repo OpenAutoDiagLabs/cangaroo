@@ -207,32 +207,19 @@ uint64_t CanMessage::extractRawSignal(uint8_t start_bit, const uint8_t length, c
     if (length == 0 || start_bit >= sizeof(_u8) * 8 || length > 64) return 0;
 
     if (!isBigEndian) {
-        int byte_offset = start_bit / 8;
-        int bit_shift = start_bit % 8;
-
-        uint8_t temp[8] = {0};
-        int copy_len = sizeof(_u8) - byte_offset;
-        if (copy_len > 8) copy_len = 8;
-        
-        // Copy the relevant bytes up to 8 bytes
-        for (int i=0; i<copy_len; i++) {
-            temp[i] = _u8[byte_offset + i];
+        uint64_t data = 0;
+        for (int i = 0; i < length; ++i) {
+            int currentBit = start_bit + i;
+            int byteIndex = currentBit / 8;
+            int bitInByte = currentBit % 8;
+            
+            if (byteIndex < sizeof(_u8)) {
+                if (_u8[byteIndex] & (1 << bitInByte)) {
+                    data |= (1ULL << i);
+                }
+            }
         }
-
-        uint64_t data_raw = 0;
-        // Interpret as little-endian 64-bit integer
-        for (int i=0; i<8; i++) {
-            data_raw |= ((uint64_t)temp[i]) << (i * 8);
-        }
-        
-        // Shift by bit_shift
-        uint64_t data = data_raw >> bit_shift;
-
-        uint64_t mask = 0xFFFFFFFFFFFFFFFFULL;
-        if (length < 64) {
-            mask = (1ULL << length) - 1;
-        }
-        return data & mask;
+        return data;
     } else {
         uint64_t data = 0;
         int currentBit = start_bit;
@@ -261,36 +248,24 @@ void CanMessage::setRawSignal(uint8_t start_bit, const uint8_t length, const boo
     if (length == 0 || start_bit >= sizeof(_u8) * 8 || length > 64) return;
 
     if (!isBigEndian) {
-        int byte_offset = start_bit / 8;
-        int bit_shift = start_bit % 8;
-
         uint64_t mask = 0xFFFFFFFFFFFFFFFFULL;
         if (length < 64) {
             mask = (1ULL << length) - 1;
         }
+        uint64_t val = value & mask;
 
-        uint64_t valToSet = (value & mask) << bit_shift;
-        uint64_t clearMask = ~(mask << bit_shift);
-
-        uint8_t temp[8] = {0};
-        int copy_len = sizeof(_u8) - byte_offset;
-        if (copy_len > 8) copy_len = 8;
-        
-        // Copy the relevant bytes up to 8 bytes
-        for (int i=0; i<copy_len; i++) {
-            temp[i] = _u8[byte_offset + i];
-        }
-
-        uint64_t data_raw = 0;
-        for (int i=0; i<8; i++) {
-            data_raw |= ((uint64_t)temp[i]) << (i * 8);
-        }
-
-        data_raw &= clearMask;
-        data_raw |= valToSet;
-
-        for (int i=0; i<copy_len; i++) {
-            _u8[byte_offset + i] = (data_raw >> (i * 8)) & 0xFF;
+        for (int i = 0; i < length; ++i) {
+            int currentBit = start_bit + i;
+            int byteIndex = currentBit / 8;
+            int bitInByte = currentBit % 8;
+            
+            if (byteIndex < sizeof(_u8)) {
+                if (val & (1ULL << i)) {
+                    _u8[byteIndex] |= (1 << bitInByte);
+                } else {
+                    _u8[byteIndex] &= ~(1 << bitInByte);
+                }
+            }
         }
     } else {
         uint64_t mask = 0xFFFFFFFFFFFFFFFFULL;
