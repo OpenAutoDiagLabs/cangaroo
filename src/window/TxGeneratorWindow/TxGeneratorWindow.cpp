@@ -238,6 +238,7 @@ void TxGeneratorWindow::on_btnAddManual_released()
     cm.msg.setId(id);
     cm.msg.setLength(ui->spinManualDlc->value());
     cm.msg.setExtended(id > 0x7FF || ui->lineManualId->text().length() > 3);
+    cm.msg.setFD(ui->spinManualDlc->value() > 8);
     cm.name = "Manual";
     cm.interval = 100;
     cm.enabled = false;

@@ -63,6 +63,7 @@ RawTxWindow::RawTxWindow(QWidget *parent, Backend &backend) :
     connect(ui->comboBoxDLC, SIGNAL(currentIndexChanged(int)), this, SLOT(changeDLC()));
 
     _is_setting_message = false;
+    _is_updating_table = false;
 
     QList<QLineEdit*> lines = this->findChildren<QLineEdit*>();
     QRegularExpression hex8("^[0-9A-Fa-f]{0,8}$");
@@ -92,6 +93,8 @@ RawTxWindow::RawTxWindow(QWidget *parent, Backend &backend) :
     connect(ui->comboBoxDLC, SIGNAL(currentIndexChanged(int)), this, SLOT(reflash_can_msg()));
 
     connect(ui->comboBoxDLC, SIGNAL(currentIndexChanged(int)), this, SLOT(reflash_can_msg()));
+
+    connect(ui->tableSignals, SIGNAL(itemChanged(QTableWidgetItem*)), this, SLOT(onSignalTableItemChanged(QTableWidgetItem*)));
 
     ui->fieldAddress->clear();
     this->setEnabled(false);
@@ -179,9 +182,11 @@ void RawTxWindow::changeDLC()
     uint8_t dlc = ui->comboBoxDLC->currentData().toUInt();
 
     // If DLC > 8, must be FD
-    if(dlc > 8)
+    if(dlc > 8 && !ui->checkbox_FD->isChecked())
     {
+        ui->checkbox_FD->blockSignals(true);
         ui->checkbox_FD->setChecked(true);
+        ui->checkbox_FD->blockSignals(false);
     }
 
     switch(dlc)
@@ -564,10 +569,12 @@ void RawTxWindow::reflash_can_msg()
     uint8_t dlc =ui->comboBoxDLC->currentData().toUInt();
 
     // If DLC > 8, must be FD
-    if(dlc > 8)
+    if(dlc > 8 && !ui->checkbox_FD->isChecked())
     {
         en_fd = true;
+        ui->checkbox_FD->blockSignals(true);
         ui->checkbox_FD->setChecked(true);
+        ui->checkbox_FD->blockSignals(false);
     }
 
     _can_msg.setId(address);
@@ -602,8 +609,12 @@ void RawTxWindow::reflash_can_msg()
 
 void RawTxWindow::updateSignalTable()
 {
+    _is_updating_table = true;
     ui->tableSignals->setRowCount(0);
-    if (!_currentDbMsg) return;
+    if (!_currentDbMsg) {
+        _is_updating_table = false;
+        return;
+    }
 
     CanDbSignalList sigList = _currentDbMsg->getSignals();
     ui->tableSignals->setRowCount(sigList.size());
@@ -612,9 +623,48 @@ void RawTxWindow::updateSignalTable()
         CanDbSignal *sig = sigList[i];
         double val = sig->extractPhysicalFromMessage(_can_msg);
         
-        ui->tableSignals->setItem(i, 0, new QTableWidgetItem(sig->name()));
-        ui->tableSignals->setItem(i, 1, new QTableWidgetItem(QString::number(val, 'f', 2)));
-        ui->tableSignals->setItem(i, 2, new QTableWidgetItem(sig->getUnit()));
+        QTableWidgetItem *nameItem = new QTableWidgetItem(sig->name());
+        nameItem->setFlags(nameItem->flags() & ~Qt::ItemIsEditable);
+        ui->tableSignals->setItem(i, 0, nameItem);
+        
+        QTableWidgetItem *valItem = new QTableWidgetItem(QString::number(val, 'f', 2));
+        valItem->setData(Qt::UserRole, QVariant::fromValue((void*)sig));
+        ui->tableSignals->setItem(i, 1, valItem);
+        
+        QTableWidgetItem *unitItem = new QTableWidgetItem(sig->getUnit());
+        unitItem->setFlags(unitItem->flags() & ~Qt::ItemIsEditable);
+        ui->tableSignals->setItem(i, 2, unitItem);
+    }
+    _is_updating_table = false;
+}
+
+void RawTxWindow::onSignalTableItemChanged(QTableWidgetItem *item)
+{
+    if (_is_updating_table || !item) return;
+
+    if (item->column() == 1) {
+        CanDbSignal *sig = (CanDbSignal*)item->data(Qt::UserRole).value<void*>();
+        if (sig) {
+            bool ok;
+            double physicalValue = item->text().toDouble(&ok);
+            if (ok) {
+                sig->applyPhysicalToMessage(physicalValue, _can_msg);
+                
+                _is_setting_message = true;
+                
+                for (int i = 0; i < 64; ++i) {
+                    QString fieldName = QString("fieldByte%1_%2").arg(i % 8).arg(i / 8);
+                    QLineEdit *field = this->findChild<QLineEdit*>(fieldName);
+                    if (field) {
+                        field->setText(QString("%1").arg(_can_msg.getByte(i), 2, 16, QChar('0')).toUpper());
+                    }
+                }
+                
+                _is_setting_message = false;
+                
+                emit messageUpdated(_can_msg);
+            }
+        }
     }
 }
 

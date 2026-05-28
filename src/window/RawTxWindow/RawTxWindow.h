@@ -33,6 +33,7 @@ class QDomDocument;
 class QDomElement;
 
 class CanDbMessage;
+class QTableWidgetItem;
 
 class RawTxWindow : public ConfigurableWidget
 {
@@ -68,6 +69,8 @@ private slots:
 
     void repeatmsg_timer_timeout();
 
+    void onSignalTableItemChanged(QTableWidgetItem *item);
+
 
 private:
     Ui::RawTxWindow *ui;
@@ -85,6 +88,7 @@ private:
 
     CanInterfaceId _slavedInterfaceId;
     bool _is_setting_message;
+    bool _is_updating_table;
     CanDbMessage *_currentDbMsg;
 
 };

@@ -160,17 +160,27 @@ void BitMatrixWidget::paintEvent(QPaintEvent *event)
                     painter.setFont(f);
 
                     // C. Smart Formatting Logic
+                    QString orderText = signal->isBigEndian() ? "MSB to LSB" : "LSB to MSB";
+                    QString mappedName = signal->name() + " (" + orderText + ")";
                     QString rawName = signal->name();
-                    QString arrowName = QString("<-- %1 -->").arg(rawName);
+                    QString arrowName = QString("<-- %1 -->").arg(mappedName);
                     
                     // Measure widths to decide format
                     QFontMetrics fm(f);
                     int arrowWidth = fm.horizontalAdvance(arrowName);
+                    int mappedWidth = fm.horizontalAdvance(mappedName);
                     int boxWidth = mergedRect.width();
 
                     // Logic: Only use arrows if there is plenty of space (text < 90% of box)
                     // Otherwise, fall back to just the name to prevent clipping
-                    QString finalText = (arrowWidth < (boxWidth * 0.9)) ? arrowName : rawName;
+                    QString finalText;
+                    if (arrowWidth < (boxWidth * 0.9)) {
+                        finalText = arrowName;
+                    } else if (mappedWidth < (boxWidth * 0.9)) {
+                        finalText = mappedName;
+                    } else {
+                        finalText = rawName;
+                    }
 
                     // D. Draw with Word Wrap
                     // Qt::TextWordWrap allows text to break into new lines if it hits the edge
