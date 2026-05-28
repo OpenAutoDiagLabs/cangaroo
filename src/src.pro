@@ -60,11 +60,15 @@ include($$PWD/window/CanStatusWindow/CanStatusWindow.pri)
 include($$PWD/window/RawTxWindow/RawTxWindow.pri)
 include($$PWD/window/TxGeneratorWindow/TxGeneratorWindow.pri)
 include($$PWD/window/ReplayWindow/ReplayWindow.pri)
+include($$PWD/window/ScriptWindow/ScriptWindow.pri)
 
 
 unix:PKGCONFIG += libnl-3.0
 unix:PKGCONFIG += libnl-route-3.0
+unix:PKGCONFIG += python3-embed
 unix:INCLUDEPATH += /usr/include/libnl3
+unix:INCLUDEPATH += /home/jayachandran/.local/lib/python3.8/site-packages/pybind11/include
+unix:INCLUDEPATH += /usr/include/python3.10
 # Surgical fix for redundant /lib/lib path from pkg-config
 unix:LIBS ~= s|/usr/lib/lib/|/usr/lib/|g
 unix:include($$PWD/driver/SocketCanDriver/SocketCanDriver.pri)

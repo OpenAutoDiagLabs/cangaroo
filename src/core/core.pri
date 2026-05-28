@@ -13,7 +13,8 @@ SOURCES += \
     $$PWD/ConfigurableWidget.cpp \
     $$PWD/Log.cpp \
     $$PWD/ThemeManager.cpp \
-    $$PWD/ConditionalLoggingManager.cpp
+    $$PWD/ConditionalLoggingManager.cpp \
+    $$PWD/PythonEngine.cpp
 
 HEADERS += \
     $$PWD/portable_endian.h \
@@ -31,4 +32,5 @@ HEADERS += \
     $$PWD/ConfigurableWidget.h \
     $$PWD/Log.h \
     $$PWD/ThemeManager.h \
-    $$PWD/ConditionalLoggingManager.h
+    $$PWD/ConditionalLoggingManager.h \
+    $$PWD/PythonEngine.h

@@ -956,5 +956,7 @@ void RawTxWindow::setMessage(const CanMessage &msg, const QString &name, CanInte
 
     updateSignalTable();
 
+    _can_msg = msg;
+
     _is_setting_message = false;
 }

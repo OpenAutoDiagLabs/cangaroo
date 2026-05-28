@@ -149,6 +149,7 @@
      <addaction name="actionGraph_View_2"/>
      <addaction name="actionTransmit_View"/>
      <addaction name="actionGenerator_View"/>
+     <addaction name="actionScript_View"/>
     </widget>
     <addaction name="menu_New"/>
    </widget>
@@ -318,6 +319,11 @@
   <action name="actionGenerator_View">
    <property name="text">
     <string>Generator View</string>
+   </property>
+  </action>
+  <action name="actionScript_View">
+   <property name="text">
+    <string>Script View</string>
    </property>
   </action>
  </widget>

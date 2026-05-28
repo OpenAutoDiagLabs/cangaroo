@@ -67,6 +67,7 @@ public slots:
     QDockWidget *addRawTxWidget(QMainWindow *parent=0);
     QDockWidget *addLogWidget(QMainWindow *parent=0);
     QDockWidget *addStatusWidget(QMainWindow *parent=0);
+    QDockWidget *addScriptWidget(QMainWindow *parent = nullptr);
     QDockWidget *addTxGeneratorWidget(QMainWindow *parent=0);
     QDockWidget *addReplayWidget(QMainWindow *parent=0);
 

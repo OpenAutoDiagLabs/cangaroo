@@ -40,8 +40,17 @@ Cangaroo is a professional-grade CAN bus analyzer designed for engineers in **Au
 *   **Wide Hardware Compatibility**: Seamlessly works with **SocketCAN** on Linux (supports PCAN, Kvaser, etc.), **WinUSB/CandleAPI** on Windows (gs_usb/CandleLight adapters), **SLCAN**, and **CANblaster** (UDP).
 *   **DBC Database Support**: Load multiple `.dbc` files to instantly decode frames into human-readable signals.
 *   **Powerful Data Visualization**: Integrated Graphing tools supporting Time-series, Scatter charts, Text-based monitoring, and interactive Gauge views with zoom and live tooltips.
+*   **Python Scripting API**: Automate measurement and simulation via an embedded Python engine. View the [API Documentation](cangaroo_python_api.md).
 *   **Advanced Filtering & Logging**: Isolate critical data with live filters and export captures for offline analysis.
 *   **Modern Workspace**: A clean, dockable userinterface optimized for multi-monitor setups.
+
+---
+
+## 🐍 Python Automation
+
+CANgaroo includes an embedded Python environment that allows you to script repetitive tasks, automate complex transmission sequences, or analyze incoming traffic programmatically.
+
+Check out the full [Python API Documentation](cangaroo_python_api.md) for examples and reference.
 
 ---
 

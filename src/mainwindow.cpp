@@ -55,6 +55,7 @@
 #include <window/RawTxWindow/RawTxWindow.h>
 #include <window/TxGeneratorWindow/TxGeneratorWindow.h>
 #include <window/ReplayWindow/ReplayWindow.h>
+#include "window/ScriptWindow/ScriptWindow.h"
 
 #include <driver/SLCANDriver/SLCANDriver.h>
 #include <driver/GrIPDriver/GrIPDriver.h>
@@ -121,9 +122,9 @@ MainWindow::MainWindow(QWidget *parent) :
 
     QAction *actionReplayView = new QAction(tr("Replay View"), this);
     ui->menuWindow->addAction(actionReplayView);
+    connect(ui->actionGenerator_View, &QAction::triggered, this, [this](){ addTxGeneratorWidget(); });
     connect(actionReplayView, &QAction::triggered, this, [this](){ addReplayWidget(); });
-
-    connect(ui->actionStart_Measurement, SIGNAL(triggered()), this, SLOT(startMeasurement()));
+    connect(ui->actionScript_View, &QAction::triggered, this, [this](){ addScriptWidget(); });
     connect(ui->btnStartMeasurement, SIGNAL(released()), this, SLOT(startMeasurement()));
     connect(ui->actionStop_Measurement, SIGNAL(triggered()), this, SLOT(stopMeasurement()));
     connect(ui->btnStopMeasurement, SIGNAL(released()), this, SLOT(stopMeasurement()));
@@ -363,6 +364,11 @@ bool MainWindow::loadWorkspaceTab(QDomElement el)
         {
             mdi->loadXML(backend(), el);
         }
+
+        ScriptWindow *script = mw->findChild<ScriptWindow *>();
+        QDomElement scriptEl = el.firstChildElement("scriptwindow");
+        if (script && !scriptEl.isNull())
+            script->loadXML(backend(), scriptEl);
     }
 
     return true;
@@ -475,6 +481,14 @@ bool MainWindow::saveWorkspaceToFile(QString filename)
         }
 
         tabsRoot.appendChild(tabEl);
+
+        ScriptWindow *script = w->findChild<ScriptWindow *>();
+        if (script)
+        {
+            QDomElement scriptEl = doc.createElement("scriptwindow");
+            script->saveXML(backend(), doc, scriptEl);
+            tabEl.appendChild(scriptEl);
+        }
     }
 
     QDomElement setupRoot = doc.createElement("setup");
@@ -633,6 +647,7 @@ QMainWindow *MainWindow::createTraceWindow(QString title)
     QDockWidget *dockRawTxWidget = addRawTxWidget(mm);
     QDockWidget *dockGeneratorWidget = addTxGeneratorWidget(mm);
     QDockWidget *dockReplayWidget = addReplayWidget(mm);
+    QDockWidget *dockScriptWidget = addScriptWidget(mm);
 
     TxGeneratorWindow *gen = qobject_cast<TxGeneratorWindow*>(dockGeneratorWidget->widget());
     RawTxWindow *rawtx = qobject_cast<RawTxWindow*>(dockRawTxWidget->widget());
@@ -648,6 +663,8 @@ QMainWindow *MainWindow::createTraceWindow(QString title)
     mm->splitDockWidget(dockGeneratorWidget,dockLogWidget,Qt::Horizontal);
     mm->tabifyDockWidget(dockGeneratorWidget, dockRawTxWidget); // Generator first, Message next
     mm->tabifyDockWidget(dockGeneratorWidget, dockReplayWidget); // Replay in that group too
+    mm->splitDockWidget(dockScriptWidget, dockLogWidget, Qt::Horizontal);
+    mm->tabifyDockWidget(dockGeneratorWidget, dockScriptWidget);
     mm->splitDockWidget(dockStatusWidget,dockLogWidget,Qt::Horizontal);
     mm->tabifyDockWidget(dockStatusWidget, dockLogWidget); // Status first, Log next
     
@@ -779,6 +796,22 @@ QDockWidget *MainWindow::addReplayWidget(QMainWindow *parent)
     ReplayWindow *replay = new ReplayWindow(dock, backend());
     dock->setWidget(replay);
     parent->addDockWidget(Qt::BottomDockWidgetArea, dock);
+    return dock;
+}
+
+QDockWidget *MainWindow::addScriptWidget(QMainWindow *parent)
+{
+    if (!parent)
+    {
+        parent = currentTab();
+    }
+    QDockWidget *dock = new QDockWidget(tr("Python Script"), parent);
+    ScriptWindow *script = new ScriptWindow(dock, backend());
+    dock->setWidget(script);
+    parent->addDockWidget(Qt::BottomDockWidgetArea, dock);
+    
+    connect(script, &ScriptWindow::settingsChanged, this, [this]() { setWorkspaceModified(true); });
+    
     return dock;
 }
 
