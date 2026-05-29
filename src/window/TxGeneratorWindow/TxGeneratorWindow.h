@@ -24,6 +24,7 @@
 #include <core/ConfigurableWidget.h>
 #include <core/MeasurementSetup.h>
 #include <QList>
+#include <QMap>
 #include <QTreeWidgetItem>
 
 
@@ -32,6 +33,7 @@ class TxGeneratorWindow;
 }
 
 #include "BitMatrixWidget.h"
+#include "WaveformDialog.h"
 #include <core/CanDbMessage.h>
 #include <core/CanDbSignal.h>
 
@@ -82,6 +84,9 @@ private slots:
     void updateMeasurementState();
     void refreshInterfaces();
     void onRandomPayloadReleased();
+    void onTreeActiveContextMenu(const QPoint &pos);
+    void onWaveformButtonReleased();
+    void onCreateGroupReleased();
 
 private:
     Ui::TxGeneratorWindow *ui;
@@ -89,6 +94,8 @@ private:
     QTimer *_sendTimer;
     BitMatrixWidget *_bitMatrixWidget;
     class QPushButton *_btnRandomPayload;
+    class QPushButton *_btnWaveform;
+    class QPushButton *_btnCreateGroup;
 
     struct CyclicMessage {
         CanMessage msg;
@@ -98,6 +105,8 @@ private:
         uint64_t lastSent;
         CanInterfaceId interfaceId;
         CanDbMessage *dbMsg;
+        QString groupName;                       // empty = ungrouped
+        QMap<QString, WaveformConfig> waveforms; // signal name → waveform config
     };
 
     QList<CyclicMessage> _cyclicMessages;
@@ -105,7 +114,21 @@ private:
     bool isLoading;
     void updateAvailableList();
     void updateActiveList();
-    void updateRowUI(int row);
+    void updateRowUI(int msgIndex);
     void populateDbcMessages();
-};
 
+    // Returns the _cyclicMessages index stored in the item, or -1 for group headers
+    int itemToMsgIndex(QTreeWidgetItem *item) const;
+    // Returns all selected message indices (skips group headers)
+    QList<int> selectedMsgIndices() const;
+    // Creates or returns the group header item for the given group name
+    QTreeWidgetItem *findOrCreateGroupItem(const QString &groupName,
+                                           QMap<QString, QTreeWidgetItem*> &groupItems);
+
+    void applyWaveforms(CyclicMessage &cm, uint64_t now_ms);
+    void setGroupEnabled(const QString &groupName, bool enabled);
+    void createGroup(const QString &suggested = QString());
+    void renameGroup(const QString &oldName, const QString &newName);
+    void deleteGroup(const QString &groupName, bool deleteMessages);
+    void assignToGroup(const QList<int> &indices, const QString &groupName);
+};
