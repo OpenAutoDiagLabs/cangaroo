@@ -6,6 +6,14 @@
 #include <QMenu>
 #include <QInputDialog>
 #include <QMessageBox>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QListWidget>
+#include <QLineEdit>
+#include <QLabel>
+#include <QSplitter>
 #include <core/Backend.h>
 #include <core/MeasurementNetwork.h>
 #include <core/MeasurementSetup.h>
@@ -524,38 +532,159 @@ void TxGeneratorWindow::onStatusButtonClicked()
 
 void TxGeneratorWindow::onCreateGroupReleased()
 {
-    createGroup();
+    editGroupMembers(QString());
 }
 
-void TxGeneratorWindow::createGroup(const QString &suggested)
+void TxGeneratorWindow::editGroupMembers(const QString &existingGroupName)
 {
-    bool ok;
-    QString name = QInputDialog::getText(this, tr("Create Group"),
-        tr("Group name:"), QLineEdit::Normal, suggested, &ok);
-    if (!ok || name.trimmed().isEmpty()) return;
-    name = name.trimmed();
+    const bool isNew = existingGroupName.isEmpty();
 
-    // Move any currently selected message items into the new group
-    QList<int> rows = selectedMsgIndices();
-    if (!rows.isEmpty()) {
-        assignToGroup(rows, name);
-    } else {
-        // Just make sure at least one row exists with that group name (creates the header on next rebuild)
-        // If nothing selected, create an empty placeholder – we'll create the group visually; user can
-        // drag items in later via context menu. For now just notify user.
-        QMessageBox::information(this, tr("Group Created"),
-            tr("Group \"%1\" will appear when you assign messages to it via the context menu.").arg(name));
-    }
-}
+    QDialog dlg(this);
+    dlg.setWindowTitle(isNew ? tr("Create Group") : tr("Edit Group — %1").arg(existingGroupName));
+    dlg.resize(540, 420);
+    dlg.setMinimumSize(420, 320);
 
-void TxGeneratorWindow::renameGroup(const QString &oldName, const QString &newName)
-{
-    for (CyclicMessage &cm : _cyclicMessages) {
-        if (cm.groupName == oldName)
-            cm.groupName = newName;
+    QVBoxLayout *mainLayout = new QVBoxLayout(&dlg);
+
+    // ── Group name field ──────────────────────────────────────────────────
+    QHBoxLayout *nameRow = new QHBoxLayout;
+    nameRow->addWidget(new QLabel(tr("Group name:"), &dlg));
+    QLineEdit *nameEdit = new QLineEdit(existingGroupName, &dlg);
+    nameEdit->setPlaceholderText(tr("Enter group name…"));
+    nameRow->addWidget(nameEdit, 1);
+    mainLayout->addLayout(nameRow);
+
+    QFrame *sep = new QFrame(&dlg);
+    sep->setFrameShape(QFrame::HLine);
+    sep->setStyleSheet("color: #555;");
+    mainLayout->addWidget(sep);
+
+    // ── Two-panel list area ───────────────────────────────────────────────
+    QHBoxLayout *listsRow = new QHBoxLayout;
+
+    // Left: Available messages (not in this group)
+    QVBoxLayout *availCol = new QVBoxLayout;
+    QLabel *lblAvail = new QLabel(tr("Available Messages"), &dlg);
+    lblAvail->setStyleSheet("font-weight: bold;");
+    availCol->addWidget(lblAvail);
+    QListWidget *availList = new QListWidget(&dlg);
+    availList->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    availList->setAlternatingRowColors(true);
+    availList->setToolTip(tr("Double-click or use Add → to move into the group"));
+    availCol->addWidget(availList);
+    listsRow->addLayout(availCol, 1);
+
+    // Centre: transfer buttons
+    QVBoxLayout *btnCol = new QVBoxLayout;
+    btnCol->addStretch();
+    QPushButton *btnAdd    = new QPushButton(tr("Add →"),    &dlg);
+    QPushButton *btnRemove = new QPushButton(tr("← Remove"), &dlg);
+    btnAdd->setFixedWidth(95);
+    btnRemove->setFixedWidth(95);
+    btnAdd->setStyleSheet(
+        "QPushButton { background:#28a745; color:white; font-weight:bold; border-radius:4px; padding:4px; }"
+        "QPushButton:hover { background:#218838; }");
+    btnRemove->setStyleSheet(
+        "QPushButton { background:#dc3545; color:white; font-weight:bold; border-radius:4px; padding:4px; }"
+        "QPushButton:hover { background:#c82333; }");
+    btnCol->addWidget(btnAdd);
+    btnCol->addSpacing(6);
+    btnCol->addWidget(btnRemove);
+    btnCol->addStretch();
+    listsRow->addLayout(btnCol);
+
+    // Right: Messages in group
+    QVBoxLayout *inGroupCol = new QVBoxLayout;
+    QLabel *lblInGroup = new QLabel(tr("In Group"), &dlg);
+    lblInGroup->setStyleSheet("font-weight: bold; color: #28a745;");
+    inGroupCol->addWidget(lblInGroup);
+    QListWidget *inGroupList = new QListWidget(&dlg);
+    inGroupList->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    inGroupList->setAlternatingRowColors(true);
+    inGroupList->setToolTip(tr("Double-click or use ← Remove to move back to available"));
+    inGroupCol->addWidget(inGroupList);
+    listsRow->addLayout(inGroupCol, 1);
+
+    mainLayout->addLayout(listsRow, 1);
+
+    // Hint label
+    QLabel *hint = new QLabel(
+        tr("Tip: double-click an entry to move it, or select multiple rows and use the buttons."),
+        &dlg);
+    hint->setStyleSheet("color: #888; font-size: 10px;");
+    hint->setWordWrap(true);
+    mainLayout->addWidget(hint);
+
+    // Dialog buttons
+    QDialogButtonBox *buttonBox = new QDialogButtonBox(
+        QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+    mainLayout->addWidget(buttonBox);
+
+    // ── Populate lists ────────────────────────────────────────────────────
+    for (int i = 0; i < _cyclicMessages.size(); ++i) {
+        const CyclicMessage &cm = _cyclicMessages[i];
+        CanInterface *intf = _backend.getInterfaceById(cm.interfaceId);
+        QString label = QString("0x%1  %2  [%3]")
+            .arg(cm.msg.getId(), 3, 16, QChar('0')).toUpper()
+            .arg(cm.name)
+            .arg(intf ? intf->getName() : tr("?"));
+        // If already in a different group, note it
+        if (!cm.groupName.isEmpty() && cm.groupName != existingGroupName)
+            label += QString("  ← %1").arg(cm.groupName);
+
+        QListWidgetItem *item = new QListWidgetItem(label);
+        item->setData(Qt::UserRole, i);
+
+        if (!existingGroupName.isEmpty() && cm.groupName == existingGroupName)
+            inGroupList->addItem(item);
+        else
+            availList->addItem(item);
     }
+
+    // ── Connections ───────────────────────────────────────────────────────
+    auto moveToGroup = [&]() {
+        const auto sel = availList->selectedItems();
+        for (QListWidgetItem *it : sel)
+            inGroupList->addItem(availList->takeItem(availList->row(it)));
+    };
+    auto moveToAvail = [&]() {
+        const auto sel = inGroupList->selectedItems();
+        for (QListWidgetItem *it : sel)
+            availList->addItem(inGroupList->takeItem(inGroupList->row(it)));
+    };
+
+    QObject::connect(btnAdd,    &QPushButton::clicked, &dlg, moveToGroup);
+    QObject::connect(btnRemove, &QPushButton::clicked, &dlg, moveToAvail);
+    QObject::connect(availList,   &QListWidget::itemDoubleClicked, &dlg,
+        [&](QListWidgetItem *it){ inGroupList->addItem(availList->takeItem(availList->row(it))); });
+    QObject::connect(inGroupList, &QListWidget::itemDoubleClicked, &dlg,
+        [&](QListWidgetItem *it){ availList->addItem(inGroupList->takeItem(inGroupList->row(it))); });
+    QObject::connect(buttonBox, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    QObject::connect(buttonBox, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+    if (dlg.exec() != QDialog::Accepted) return;
+
+    QString newName = nameEdit->text().trimmed();
+    if (newName.isEmpty()) return;
+
+    // Clear old group assignment for any message that was in the existing group
+    if (!existingGroupName.isEmpty()) {
+        for (CyclicMessage &cm : _cyclicMessages) {
+            if (cm.groupName == existingGroupName)
+                cm.groupName.clear();
+        }
+    }
+
+    // Assign the in-group items to the (possibly new or renamed) group
+    for (int i = 0; i < inGroupList->count(); ++i) {
+        int msgIdx = inGroupList->item(i)->data(Qt::UserRole).toInt();
+        if (msgIdx >= 0 && msgIdx < _cyclicMessages.size())
+            _cyclicMessages[msgIdx].groupName = newName;
+    }
+
     updateActiveList();
 }
+
 
 void TxGeneratorWindow::deleteGroup(const QString &groupName, bool deleteMessages)
 {
@@ -600,29 +729,26 @@ void TxGeneratorWindow::onTreeActiveContextMenu(const QPoint &pos)
     if (!item) {
         // Empty area — offer to create a group
         QAction *actCreate = menu.addAction(tr("Create Group..."));
-        connect(actCreate, &QAction::triggered, this, [this]() { createGroup(); });
+        connect(actCreate, &QAction::triggered, this, [this]() { editGroupMembers(QString()); });
     } else {
         int idx = itemToMsgIndex(item);
         if (idx < 0) {
             // Group header
             QString grpName = item->data(COL_STATUS, ROLE_GROUP).toString();
 
+            QAction *actEdit = menu.addAction(tr("✏ Edit Group Members..."));
+            actEdit->setToolTip(tr("Add or remove messages from this group"));
+            connect(actEdit, &QAction::triggered, this, [this, grpName]() {
+                editGroupMembers(grpName);
+            });
+
+            menu.addSeparator();
+
             QAction *actRunAll = menu.addAction(tr("▶ Run All in Group"));
             connect(actRunAll, &QAction::triggered, this, [this, grpName]() { setGroupEnabled(grpName, true); });
 
             QAction *actStopAll = menu.addAction(tr("⏹ Stop All in Group"));
             connect(actStopAll, &QAction::triggered, this, [this, grpName]() { setGroupEnabled(grpName, false); });
-
-            menu.addSeparator();
-
-            QAction *actRename = menu.addAction(tr("Rename Group..."));
-            connect(actRename, &QAction::triggered, this, [this, grpName]() {
-                bool ok;
-                QString newName = QInputDialog::getText(this, tr("Rename Group"),
-                    tr("New name:"), QLineEdit::Normal, grpName, &ok);
-                if (ok && !newName.trimmed().isEmpty())
-                    renameGroup(grpName, newName.trimmed());
-            });
 
             menu.addSeparator();
 
@@ -633,49 +759,35 @@ void TxGeneratorWindow::onTreeActiveContextMenu(const QPoint &pos)
 
             QAction *actDelAll = menu.addAction(tr("Delete Group + Messages"));
             connect(actDelAll, &QAction::triggered, this, [this, grpName]() {
-                auto btn = QMessageBox::question(this, tr("Delete Group"),
-                    tr("Remove group \"%1\" and all its messages?").arg(grpName));
-                if (btn == QMessageBox::Yes)
+                if (QMessageBox::question(this, tr("Delete Group"),
+                        tr("Remove group \"%1\" and all its messages?").arg(grpName))
+                        == QMessageBox::Yes)
                     deleteGroup(grpName, true);
             });
         } else {
-            // Message item — group assignment options
+            // Message item — quick group assignment
             QString currentGroup = _cyclicMessages[idx].groupName;
 
-            // Collect existing group names
             QStringList groups;
-            for (const CyclicMessage &cm : _cyclicMessages) {
+            for (const CyclicMessage &cm : _cyclicMessages)
                 if (!cm.groupName.isEmpty() && !groups.contains(cm.groupName))
                     groups.append(cm.groupName);
-            }
 
             QMenu *assignMenu = menu.addMenu(tr("Assign to Group"));
-            if (groups.isEmpty()) {
-                QAction *noGrp = assignMenu->addAction(tr("(no groups yet)"));
-                noGrp->setEnabled(false);
-            } else {
-                for (const QString &g : groups) {
-                    QAction *act = assignMenu->addAction(g);
-                    act->setCheckable(true);
-                    act->setChecked(g == currentGroup);
-                    connect(act, &QAction::triggered, this, [this, g]() {
-                        QList<int> sel = selectedMsgIndices();
-                        if (sel.isEmpty()) sel.append(itemToMsgIndex(ui->treeActive->currentItem()));
-                        assignToGroup(sel, g);
-                    });
-                }
-            }
-            assignMenu->addSeparator();
-            QAction *actNew = assignMenu->addAction(tr("New Group..."));
-            connect(actNew, &QAction::triggered, this, [this]() {
-                bool ok;
-                QString name = QInputDialog::getText(this, tr("New Group"), tr("Group name:"),
-                    QLineEdit::Normal, QString(), &ok);
-                if (ok && !name.trimmed().isEmpty()) {
+            for (const QString &g : groups) {
+                QAction *act = assignMenu->addAction(g);
+                act->setCheckable(true);
+                act->setChecked(g == currentGroup);
+                connect(act, &QAction::triggered, this, [this, g]() {
                     QList<int> sel = selectedMsgIndices();
                     if (sel.isEmpty()) sel.append(itemToMsgIndex(ui->treeActive->currentItem()));
-                    assignToGroup(sel, name.trimmed());
-                }
+                    assignToGroup(sel, g);
+                });
+            }
+            assignMenu->addSeparator();
+            QAction *actNewGrp = assignMenu->addAction(tr("New Group..."));
+            connect(actNewGrp, &QAction::triggered, this, [this]() {
+                editGroupMembers(QString());
             });
 
             if (!currentGroup.isEmpty()) {
