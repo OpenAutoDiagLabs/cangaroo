@@ -127,8 +127,7 @@ private:
 
     void applyWaveforms(CyclicMessage &cm, uint64_t now_ms);
     void setGroupEnabled(const QString &groupName, bool enabled);
-    void createGroup(const QString &suggested = QString());
-    void renameGroup(const QString &oldName, const QString &newName);
+    void editGroupMembers(const QString &existingGroupName); // empty = create new
     void deleteGroup(const QString &groupName, bool deleteMessages);
     void assignToGroup(const QList<int> &indices, const QString &groupName);
 };
